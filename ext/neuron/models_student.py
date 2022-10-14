@@ -471,8 +471,8 @@ def conv_dec(nb_features,
         prefix = model_name
 
     # if using skip connections, make sure need to use them.
-    if use_skip_connections:
-        assert input_model is not None, "is using skip connections, tensors dictionary is required"
+    # if use_skip_connections:
+    #     assert input_model is not None, "is using skip connections, tensors dictionary is required"
 
     # first layer: input
     input_name = '%s_input' % prefix
@@ -481,7 +481,7 @@ def conv_dec(nb_features,
         last_tensor = input_tensor
     else:
         input_tensor = input_model.input
-        last_tensor = input_model.output[-1]
+        last_tensor = input_model.output[0]
         input_shape = last_tensor.shape.as_list()[1:]
 
     # vol size info
@@ -563,6 +563,11 @@ def conv_dec(nb_features,
             name = '%s_bn_up_%d' % (prefix, level)
             last_tensor = KL.BatchNormalization(axis=batch_norm, name=name)(last_tensor)
             
+        # last_tensor_list.append(last_tensor)
+        
+    # output = tf.keras.backend.concatenate(last_tensor_list)
+        
+            
             
     # Compute likelyhood prediction (no activation yet)
     name = '%s_likelihood' % prefix
@@ -581,8 +586,12 @@ def conv_dec(nb_features,
         name = '%s_prediction' % prefix
         pred_tensor = KL.Activation('linear', name=name)(like_tensor)
 
+    
+    # loss_compute_layer = loss_layer()
+    # loss = loss_compute_layer(input_model.outputs, last_tensor_list)
     # create the model and retun
-    model = Model(inputs=input_tensor, outputs=last_tensor, name=model_name)
+    # model = Model(inputs=input_model.outputs, outputs=loss, name=model_name)
+    model = Model(inputs=input_tensor, outputs=last_tensor_list[-1], name=model_name)
     return model
 
 
@@ -1055,3 +1064,30 @@ def _softmax(x, axis=-1, alpha=1):
         return e / s
     else:
         raise ValueError('Cannot apply softmax to a tensor that is 1D')
+    
+    
+class loss_layer(KL.Layer):
+    def __init__(self):
+        super().__init__()
+        self.cosine_loss = tf.keras.losses.CosineSimilarity(axis=1)
+        self.mse_loss = tf.keras.losses.MeanSquaredError()
+    def __call__(self, y_true, y_pred):
+        last_tensor_list = y_pred[1:]
+        label_list = y_true[2:]
+
+        # loss = tf.constant(0)
+        loss_list = []
+        # check shapes
+        for i, x in enumerate(last_tensor_list):
+            assert last_tensor_list[i].shape[-1] == label_list[i].shape[-1], '{i}th label_list shape does not match!!'
+            
+            last_tensor = last_tensor_list[i]
+        
+            # loss = KL.add([self.cosine_loss(last_tensor_list[i], label_list[i]), loss])
+            # loss_list.append(self.cosine_loss(last_tensor_list[i], label_list[i]))
+            # loss_list.append(self.mse_loss(last_tensor_))
+        loss = KL.add(loss_list)
+        return loss
+    
+    
+

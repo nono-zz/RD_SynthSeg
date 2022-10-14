@@ -24,7 +24,7 @@ import keras.backend as K
 from keras.models import Model
 
 # project imports
-from SynthSeg import evaluate
+from SynthSeg import evaluate, distillation_generator
 
 # third-party imports
 from ext.lab2im import utils
@@ -35,6 +35,8 @@ from ext.neuron import models_teacher as nrn_models
 from ext.neuron import models_student as nrm_student_models
 from . import metrics_model as metrics
 from keras.optimizers import Adam
+
+from SynthSeg.loss import CustomAccuracy
 
 
 def predict(path_images,
@@ -153,10 +155,29 @@ def predict(path_images,
     # prepare volumes if necessary
     if unique_vol_file & (path_volumes[0] is not None):
         write_csv(path_volumes[0], None, True, labels_segmentation, names_segmentation)
-
+        
+    train_gen = distillation_generator.CustomDataGen(path_images,
+                                                        path_segmentations,
+                                                        path_model,
+                                                        labels_segmentation,
+                                                        n_neutral_labels=n_neutral_labels,
+                                                        path_posteriors=path_posteriors,
+                                                        path_resampled=path_resampled,
+                                                        path_volumes=path_volumes,
+                                                        names_segmentation=names_segmentation,
+                                                        flip=flip,
+                                                        topology_classes=topology_classes,
+                                                        sigma_smoothing=sigma_smoothing,
+                                                        n_levels=n_levels,
+                                                        nb_conv_per_level=nb_conv_per_level,
+                                                        conv_size=conv_size,
+                                                        unet_feat_count=unet_feat_count,
+                                                        feat_multiplier=feat_multiplier,
+                                                        activation=activation)
     # build network
     _, _, n_dims, n_channels, _, _ = utils.get_volume_info(path_images[0])
     model_input_shape = [None] * n_dims + [n_channels]
+    # model_input_shape = [160,160,160,1]
     teacher_enc = build_teacher_model(path_model=path_model,
                       input_shape=model_input_shape,
                       labels_segmentation=labels_segmentation,
@@ -170,11 +191,11 @@ def predict(path_images,
                       flip_indices=flip_indices,
                       gradients=gradients)
     
-    teacher_enc.trainable = False       # freeze the teacher model
+    # teacher_enc.trainable = False       # freeze the teacher model
     
     student_input_shape = [None]*n_dims + [24]
-    # student_dec = build_student_model(input_shape=student_input_shape)
-    student_dec = build_student_model(input_model=teacher_enc)
+    student_dec = build_student_model(input_shape=student_input_shape)
+    # student_dec = build_student_model(input_model=teacher_enc)
 
     # set cropping/padding
     if (cropping is not None) & (min_pad is not None):
@@ -195,17 +216,26 @@ def predict(path_images,
         if compute[i]:
 
             # preprocessing
-            image, aff, h, im_res, shape, pad_idx, crop_idx = preprocess(path_image=path_images[i],
-                                                                         n_levels=n_levels,
-                                                                         target_res=target_res,
-                                                                         crop=cropping,
-                                                                         min_pad=min_pad,
-                                                                         path_resample=path_resampled[i])
+            # image, aff, h, im_res, shape, pad_idx, crop_idx = preprocess(path_image=path_images[i],
+            #                                                              n_levels=n_levels,
+            #                                                              target_res=target_res,
+            #                                                              crop=cropping,
+            #                                                              min_pad=min_pad,
+            #                                                              path_resample=path_resampled[i])
 
             # post_patch = teacher_enc.predict(image)
             
-            cos_model = metrics.metrics_model_distillation(student_dec, 'cosine')
-            cos_model.compile(optimizer=Adam(lr=1e-4), loss=metrics.IdentityLoss().loss)
+            # student_dec = Model(inputs=teacher_enc.outputs[-1], outputs=student_dec.outputs)
+            # cos_model = metrics.metrics_model_distillation(teacher_enc, student_dec, 'cosine')
+            # loss = metrics.metrics_model_distillation(teacher_enc, student_dec, 'cosine')
+            # loss = metrics.metrics_model_distillation(teacher_enc, student_dec, 'cosine')
+            # student_dec.add_loss(loss)
+            # student_dec.compile(optimizer=Adam(lr=1e-4), loss=CustomAccuracy())
+            student_dec.compile(optimizer=Adam(lr=1e-4), loss='mse')
+            student_dec.fit_generator(train_gen,
+                        epochs=1,
+                        steps_per_epoch=200,
+                        initial_epoch=0)
             
             
             
@@ -475,16 +505,16 @@ def build_teacher_model(path_model,
 def build_student_model(input_shape=None, input_model=None):
     teacher = input_model
     # build UNet
-    net = nrm_student_models.conv_dec(24,
+    net = nrm_student_models.conv_dec(12,       # used to be 24
                                         input_shape,
-                                        5,
+                                        4,      # used to be 5
                                         3,
                                         32,
                                         name='student',
-                                        prefix='unet',
+                                        prefix='student',
                                         feat_mult=2,
                                         pool_size=2,
-                                        use_skip_connections=False,
+                                        use_skip_connections=True,
                                         skip_n_concatenations=0,
                                         padding='same',
                                         dilation_rate_mult=1,

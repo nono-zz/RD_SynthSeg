@@ -24,6 +24,7 @@ License.
 # project imports
 from SynthSeg.predict import predict
 
+import os
 # paths to input/output files
 # Here we assume the availability of an image that we wish to segment with a model we have just trained.
 # We emphasise that we do not provide such an image (this is just an example after all :))
@@ -31,7 +32,18 @@ from SynthSeg.predict import predict
 # Note that path_images can also be the path to an entire folder, in which case all the images within this folder will
 # be segmented. In this case, please provide path_segm (and possibly path_posteriors, and path_resampled) as folder.
 # path_images = '/a/path/to/an/image/im.nii.gz'
-path_images = '/home/zhaoxiang/RD_SynthSeg/data/training_label_maps/training_seg_03.nii.gz'
+# root = '/home/datasets/BraTs/RSNA_ASNR_MICCAI_BraTS2021_TrainingData_16July2021'
+# subjects = os.listdir(root)
+# subjects.sort()
+# path_images = []
+        
+# for subject in subjects:
+#         subject_dir = os.path.join(root, subject)
+#         subject_path = os.path.join(subject_dir, subject + '_flair.nii.gz')
+
+#         path_images.append(subject_path)
+path_images = '/home/datasets/BraTs/RSNA_ASNR_MICCAI_BraTS2021_TrainingData_16July2021/BraTS2021_00000/BraTS2021_00000_flair.nii.gz'
+# path_images = '/home/zhaoxiang/RD_SynthSeg/data/training_label_maps/training_seg_03.nii.gz'
 # path to the output segmentation
 path_segm = '/home/zhaoxiang/RD_SynthSeg/data/training_label_maps/training_seg_03.nii.gz'
 # we can also provide paths for optional files containing the probability map for all predicted labels

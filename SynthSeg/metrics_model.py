@@ -60,26 +60,42 @@ def metrics_model(input_model, label_list, metrics='dice'):
     return model
 
 
-def metrics_model_distillation(input_model, metrics='cosine'):
+# def metrics_model_distillation(teacher_model, student_model, metrics='cosine'):
+    
+#     # get prediction
+#     last_tensor_list = student_model.outputs[2:]
+#     cosine_loss = tf.keras.losses.CosineSimilarity(axis=1)
+#     loss = 0
+#     # check shapes
+#     label_list = teacher_model.outputs[1:]
+#     for i, x in enumerate(last_tensor_list):
+#         assert last_tensor_list[i].shape[-1] == label_list[i].shape[-1], '{i}th label_list shape does not match!!'
+        
+#         last_tensor = last_tensor_list[i]
+        
+#         loss += cosine_loss(last_tensor_list[i], label_list[i])
+        
+
+#     # create the model and return
+#     # model = Model(inputs=teacher_model.inputs, outputs=loss)
+#     return loss
+
+def metrics_model_distillation(pred, label_list, metrics='cosine'):
     
     # get prediction
-    last_tensor_list = input_model.outputs
+    last_tensor_list = pred[2:]
+    label_list = label_list[1:]
     cosine_loss = tf.keras.losses.CosineSimilarity(axis=1)
     loss = 0
     # check shapes
-    label_list = input_model.get_layer('').output
     for i, x in enumerate(last_tensor_list):
-        assert last_tensor_list[i].shape == label_list[i].shape, '{i}th label_list shape does not match!!'
+        assert last_tensor_list[i].shape[-1] == label_list[i].shape[-1], '{i}th label_list shape does not match!!'
         
         last_tensor = last_tensor_list[i]
         
-        loss += cosine_loss(last_tensor_list[i].view(last_tensor_list[i].shape[0],-1),
-                                            label_list[i].view(label_list[i].shape[0],-1))
+        loss += cosine_loss(last_tensor_list[i], label_list[i])
         
-
-    # create the model and return
-    model = Model(inputs=input_model.inputs, outputs=loss)
-    return model
+    return loss
 
 
 class IdentityLoss(object):

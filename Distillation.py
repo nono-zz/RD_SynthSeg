@@ -121,6 +121,11 @@ gt_folder = '/the/path/to/the/grount_truth/gt.nii.gz'
 compute_distances = True
 
 # All right, we're ready to make predictions !!
+
+# if __name__ == '__main__':
+# import app
+# app.run(debug=False,threaded=False)
+
 predict(path_images,
         path_segm,
         path_model,

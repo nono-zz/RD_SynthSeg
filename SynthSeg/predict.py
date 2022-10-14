@@ -30,8 +30,8 @@ from SynthSeg import evaluate
 from ext.lab2im import utils
 from ext.lab2im import layers
 from ext.lab2im import edit_volumes
-# from ext.neuron import models as nrn_models
-from ext.neuron import models_teacher as nrn_models
+from ext.neuron import models as nrn_models
+# from ext.neuron import models_teacher as nrn_models
 
 
 def predict(path_images,
