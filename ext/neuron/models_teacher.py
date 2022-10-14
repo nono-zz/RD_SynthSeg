@@ -142,18 +142,18 @@ def unet(nb_features,
         pool_size = (pool_size,) * ndims
 
     # get encoding model
-    enc_model = conv_enc(nb_features,
-                         input_shape,
-                         nb_levels,
-                         conv_size,
+    enc_model = conv_enc(nb_features,  #24
+                         input_shape,    #   [1]
+                         nb_levels,         # 5
+                         conv_size,         # 3
                          name=model_name,
                          prefix=prefix,
                          feat_mult=feat_mult,
-                         pool_size=pool_size,
-                         padding=padding,
-                         dilation_rate_mult=dilation_rate_mult,
-                         activation=activation,
-                         use_residuals=use_residuals,
+                         pool_size=pool_size,           
+                         padding=padding,               # same
+                         dilation_rate_mult=dilation_rate_mult,         # 1
+                         activation=activation,     # elu
+                         use_residuals=use_residuals,           # False
                          nb_conv_per_level=nb_conv_per_level,
                          layer_nb_feats=layer_nb_feats,
                          conv_dropout=conv_dropout,
@@ -163,7 +163,7 @@ def unet(nb_features,
     # get decoder
     # use_skip_connections=True makes it a u-net
     lnf = layer_nb_feats[(nb_levels * nb_conv_per_level):] if layer_nb_feats is not None else None
-    dec_model = conv_dec(nb_features,
+    dec_model = conv_dec(nb_features,           
                          None,
                          nb_levels,
                          conv_size,
@@ -172,7 +172,7 @@ def unet(nb_features,
                          prefix=prefix,
                          feat_mult=feat_mult,
                          pool_size=pool_size,
-                         use_skip_connections=False,
+                         use_skip_connections=True,
                          skip_n_concatenations=skip_n_concatenations,
                          padding=padding,
                          dilation_rate_mult=dilation_rate_mult,
@@ -184,6 +184,35 @@ def unet(nb_features,
                          layer_nb_feats=lnf,
                          conv_dropout=conv_dropout,
                          input_model=enc_model)
+    
+    
+    
+    # nb_features,
+    # None,
+    # nb_levels,
+    # conv_size,
+    # nb_labels,
+    # name='student',
+    # prefix='unet',
+    # feat_mult=2,
+    # pool_size=2,
+    # use_skip_connections=True,
+    # skip_n_concatenations=0,
+    # padding='same',
+    # dilation_rate_mult=1,
+    # activation='elu',
+    # use_residuals=False,
+    # final_pred_activation='softmax',
+    # nb_conv_per_level=2,
+    # add_prior_layer=False,
+    # add_prior_layer_reg=0,
+    # layer_nb_feats=None,
+    # conv_dropout=0,
+    # batch_norm=None,
+    # input_model=enc_model
+
+    
+    
     final_model = dec_model
 
     if add_prior_layer:

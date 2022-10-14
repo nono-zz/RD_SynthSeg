@@ -19,6 +19,7 @@ import numpy as np
 import tensorflow as tf
 import keras.layers as KL
 from keras.models import Model
+# from keras.losses import CosineSimilarity
 
 # third-party imports
 from ext.lab2im import layers
@@ -56,6 +57,28 @@ def metrics_model(input_model, label_list, metrics='dice'):
 
     # create the model and return
     model = Model(inputs=input_model.inputs, outputs=last_tensor)
+    return model
+
+
+def metrics_model_distillation(input_model, metrics='cosine'):
+    
+    # get prediction
+    last_tensor_list = input_model.outputs
+    cosine_loss = tf.keras.losses.CosineSimilarity(axis=1)
+    loss = 0
+    # check shapes
+    label_list = input_model.get_layer('').output
+    for i, x in enumerate(last_tensor_list):
+        assert last_tensor_list[i].shape == label_list[i].shape, '{i}th label_list shape does not match!!'
+        
+        last_tensor = last_tensor_list[i]
+        
+        loss += cosine_loss(last_tensor_list[i].view(last_tensor_list[i].shape[0],-1),
+                                            label_list[i].view(label_list[i].shape[0],-1))
+        
+
+    # create the model and return
+    model = Model(inputs=input_model.inputs, outputs=loss)
     return model
 
 

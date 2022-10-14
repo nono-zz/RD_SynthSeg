@@ -32,6 +32,9 @@ from ext.lab2im import layers
 from ext.lab2im import edit_volumes
 # from ext.neuron import models as nrn_models
 from ext.neuron import models_teacher as nrn_models
+from ext.neuron import models_student as nrm_student_models
+from . import metrics_model as metrics
+from keras.optimizers import Adam
 
 
 def predict(path_images,
@@ -154,7 +157,7 @@ def predict(path_images,
     # build network
     _, _, n_dims, n_channels, _, _ = utils.get_volume_info(path_images[0])
     model_input_shape = [None] * n_dims + [n_channels]
-    net = build_model(path_model=path_model,
+    teacher_enc = build_teacher_model(path_model=path_model,
                       input_shape=model_input_shape,
                       labels_segmentation=labels_segmentation,
                       n_levels=n_levels,
@@ -166,6 +169,12 @@ def predict(path_images,
                       sigma_smoothing=sigma_smoothing,
                       flip_indices=flip_indices,
                       gradients=gradients)
+    
+    teacher_enc.trainable = False       # freeze the teacher model
+    
+    student_input_shape = [None]*n_dims + [24]
+    # student_dec = build_student_model(input_shape=student_input_shape)
+    student_dec = build_student_model(input_model=teacher_enc)
 
     # set cropping/padding
     if (cropping is not None) & (min_pad is not None):
@@ -193,63 +202,56 @@ def predict(path_images,
                                                                          min_pad=min_pad,
                                                                          path_resample=path_resampled[i])
 
-            # prediction
-            post_patch = net.predict(image)
+            # post_patch = teacher_enc.predict(image)
+            
+            cos_model = metrics.metrics_model_distillation(student_dec, 'cosine')
+            cos_model.compile(optimizer=Adam(lr=1e-4), loss=metrics.IdentityLoss().loss)
+            
+            
+            
 
-            # postprocessing
-            seg, posteriors, volumes = postprocess(post_patch=post_patch,
-                                                   shape=shape,
-                                                   pad_idx=pad_idx,
-                                                   crop_idx=crop_idx,
-                                                   n_dims=n_dims,
-                                                   labels_segmentation=labels_segmentation,
-                                                   keep_biggest_component=keep_biggest_component,
-                                                   aff=aff,
-                                                   im_res=im_res,
-                                                   topology_classes=topology_classes)
+           
+    #         utils.save_volume(seg, aff, h, path_segmentations[i], dtype='int32')
+    #         if path_posteriors[i] is not None:
+    #             if n_channels > 1:
+    #                 posteriors = utils.add_axis(posteriors, axis=[0, -1])
+    #             utils.save_volume(posteriors, aff, h, path_posteriors[i], dtype='float32')
 
-            # write results to disk
-            utils.save_volume(seg, aff, h, path_segmentations[i], dtype='int32')
-            if path_posteriors[i] is not None:
-                if n_channels > 1:
-                    posteriors = utils.add_axis(posteriors, axis=[0, -1])
-                utils.save_volume(posteriors, aff, h, path_posteriors[i], dtype='float32')
+    #         # compute volumes
+    #         if path_volumes[i] is not None:
+    #             row = [os.path.basename(path_images[i]).replace('.nii.gz', '')] + [str(vol) for vol in volumes]
+    #             write_csv(path_volumes[i], row, unique_vol_file, labels_segmentation, names_segmentation)
 
-            # compute volumes
-            if path_volumes[i] is not None:
-                row = [os.path.basename(path_images[i]).replace('.nii.gz', '')] + [str(vol) for vol in volumes]
-                write_csv(path_volumes[i], row, unique_vol_file, labels_segmentation, names_segmentation)
+    # # evaluate
+    # if gt_folder is not None:
 
-    # evaluate
-    if gt_folder is not None:
+    #     # find path where segmentations are saved evaluation folder, and get labels on which to evaluate
+    #     eval_folder = os.path.dirname(path_segmentations[0])
+    #     if evaluation_labels is None:
+    #         evaluation_labels = labels_segmentation
 
-        # find path where segmentations are saved evaluation folder, and get labels on which to evaluate
-        eval_folder = os.path.dirname(path_segmentations[0])
-        if evaluation_labels is None:
-            evaluation_labels = labels_segmentation
+    #     # set path of result arrays for surface distance if necessary
+    #     if compute_distances:
+    #         path_hausdorff = os.path.join(eval_folder, 'hausdorff.npy')
+    #         path_hausdorff_99 = os.path.join(eval_folder, 'hausdorff_99.npy')
+    #         path_hausdorff_95 = os.path.join(eval_folder, 'hausdorff_95.npy')
+    #         path_mean_distance = os.path.join(eval_folder, 'mean_distance.npy')
+    #     else:
+    #         path_hausdorff = path_hausdorff_99 = path_hausdorff_95 = path_mean_distance = None
 
-        # set path of result arrays for surface distance if necessary
-        if compute_distances:
-            path_hausdorff = os.path.join(eval_folder, 'hausdorff.npy')
-            path_hausdorff_99 = os.path.join(eval_folder, 'hausdorff_99.npy')
-            path_hausdorff_95 = os.path.join(eval_folder, 'hausdorff_95.npy')
-            path_mean_distance = os.path.join(eval_folder, 'mean_distance.npy')
-        else:
-            path_hausdorff = path_hausdorff_99 = path_hausdorff_95 = path_mean_distance = None
-
-        # compute evaluation metrics
-        evaluate.evaluation(gt_folder,
-                            eval_folder,
-                            evaluation_labels,
-                            path_dice=os.path.join(eval_folder, 'dice.npy'),
-                            path_hausdorff=path_hausdorff,
-                            path_hausdorff_99=path_hausdorff_99,
-                            path_hausdorff_95=path_hausdorff_95,
-                            path_mean_distance=path_mean_distance,
-                            list_incorrect_labels=list_incorrect_labels,
-                            list_correct_labels=list_correct_labels,
-                            recompute=recompute,
-                            verbose=verbose)
+    #     # compute evaluation metrics
+    #     evaluate.evaluation(gt_folder,
+    #                         eval_folder,
+    #                         evaluation_labels,
+    #                         path_dice=os.path.join(eval_folder, 'dice.npy'),
+    #                         path_hausdorff=path_hausdorff,
+    #                         path_hausdorff_99=path_hausdorff_99,
+    #                         path_hausdorff_95=path_hausdorff_95,
+    #                         path_mean_distance=path_mean_distance,
+    #                         list_incorrect_labels=list_incorrect_labels,
+    #                         list_correct_labels=list_correct_labels,
+    #                         recompute=recompute,
+    #                         verbose=verbose)
 
 
 def prepare_output_files(path_images, out_seg, out_posteriors, out_resampled, out_volumes, recompute):
@@ -427,7 +429,7 @@ def preprocess(path_image, n_levels, target_res, crop=None, min_pad=None, path_r
     return im, aff, h, im_res, shape, pad_idx, crop_idx
 
 
-def build_model(path_model,
+def build_teacher_model(path_model,
                 input_shape,
                 labels_segmentation,
                 n_levels,
@@ -466,32 +468,36 @@ def build_model(path_model,
                           batch_norm=-1)
     net.load_weights(path_model, by_name=True)
 
-    # smooth posteriors if specified
-    if sigma_smoothing > 0:
-        last_tensor = net.output
-        last_tensor._keras_shape = tuple(last_tensor.get_shape().as_list())
-        last_tensor = layers.GaussianBlur(sigma=sigma_smoothing)(last_tensor)
-        net = Model(inputs=net.inputs, outputs=last_tensor)
 
-    if flip_indices is not None:
+    return net
 
-        # segment flipped image
-        input_image = net.inputs[0]
-        seg = net.output
-        image_flipped = layers.RandomFlip(flip_axis=0, prob=1)(input_image)
-        last_tensor = net(image_flipped)
 
-        # flip back and re-order channels
-        last_tensor = layers.RandomFlip(flip_axis=0, prob=1)(last_tensor)
-        last_tensor = KL.Lambda(lambda x: tf.split(x, [1] * n_labels_seg, axis=-1), name='split')(last_tensor)
-        reordered_channels = [last_tensor[flip_indices[i]] for i in range(n_labels_seg)]
-        last_tensor = KL.Lambda(lambda x: tf.concat(x, -1), name='concat')(reordered_channels)
+def build_student_model(input_shape=None, input_model=None):
+    teacher = input_model
+    # build UNet
+    net = nrm_student_models.conv_dec(24,
+                                        input_shape,
+                                        5,
+                                        3,
+                                        32,
+                                        name='student',
+                                        prefix='unet',
+                                        feat_mult=2,
+                                        pool_size=2,
+                                        use_skip_connections=False,
+                                        skip_n_concatenations=0,
+                                        padding='same',
+                                        dilation_rate_mult=1,
+                                        activation='elu',
+                                        use_residuals=False,
+                                        final_pred_activation='softmax',
+                                        nb_conv_per_level=2,
+                                        layer_nb_feats=None,
+                                        conv_dropout=0,
+                                        batch_norm=None,
+                                        input_model=teacher)
 
-        # average two segmentations and build model
-        name_segm_prediction_layer = 'average_lr'
-        last_tensor = KL.Lambda(lambda x: 0.5 * (x[0] + x[1]), name=name_segm_prediction_layer)([seg, last_tensor])
-        net = Model(inputs=net.inputs, outputs=last_tensor)
-
+    
     return net
 
 

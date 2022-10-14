@@ -481,7 +481,7 @@ def conv_dec(nb_features,
         last_tensor = input_tensor
     else:
         input_tensor = input_model.input
-        last_tensor = input_model.output
+        last_tensor = input_model.output[-1]
         input_shape = last_tensor.shape.as_list()[1:]
 
     # vol size info
@@ -514,9 +514,10 @@ def conv_dec(nb_features,
         # merge layers combining previous layer
         if use_skip_connections & (level < (nb_levels - skip_n_concatenations - 1)):
             conv_name = '%s_conv_downarm_%d_%d' % (prefix, nb_levels - 2 - level, nb_conv_per_level - 1)
-            cat_tensor = input_model.get_layer(conv_name).output
+            # cat_tensor = input_model.get_layer(conv_name).output
             name = '%s_merge_%d' % (prefix, nb_levels + level)
-            last_tensor = KL.concatenate([cat_tensor, last_tensor], axis=ndims + 1, name=name)
+            # last_tensor = KL.concatenate([cat_tensor, last_tensor], axis=ndims + 1, name=name)
+            last_tensor_list.append(last_tensor)
 
         # convolution layers
         for conv in range(nb_conv_per_level):
@@ -563,8 +564,6 @@ def conv_dec(nb_features,
             last_tensor = KL.BatchNormalization(axis=batch_norm, name=name)(last_tensor)
             
             
-        last_tensor_list.append(last_tensor)
-
     # Compute likelyhood prediction (no activation yet)
     name = '%s_likelihood' % prefix
     last_tensor = convL(nb_labels, 1, activation=None, name=name)(last_tensor)
@@ -583,7 +582,7 @@ def conv_dec(nb_features,
         pred_tensor = KL.Activation('linear', name=name)(like_tensor)
 
     # create the model and retun
-    model = Model(inputs=input_tensor, outputs=pred_tensor, name=model_name)
+    model = Model(inputs=input_tensor, outputs=last_tensor, name=model_name)
     return model
 
 
